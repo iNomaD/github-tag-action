@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # config
-default_semvar_bump=${DEFAULT_BUMP:-minor}
+default_tag=${DEFAULT_TAG:-0.0.0}
 with_v=${WITH_V:-false}
 release_branches=${RELEASE_BRANCHES:-master}
 custom_tag=${CUSTOM_TAG}
@@ -38,10 +38,15 @@ fi
 if [ -z "$tag" ]
 then
     log=$(git log --pretty=oneline)
-    tag=0.0.0
+    tag=$default_tag
 else
     log=$(git log $tag..HEAD --pretty=oneline)
 fi
+
+# get and increment build number
+# will default to 1 if it was not a number
+build=$(semver get build $tag)
+build=$((build+1))
 
 # get commit logs and determine home to bump the version
 # supports #major, #minor, #patch (anything else will be 'minor')
@@ -49,7 +54,7 @@ case "$log" in
     *#major* ) new=$(semver bump major $tag);;
     *#minor* ) new=$(semver bump minor $tag);;
     *#patch* ) new=$(semver bump patch $tag);;
-    * ) new=$(semver bump `echo $default_semvar_bump` $tag);;
+    * )        new=$(semver bump build `echo $build` $tag);;
 esac
 
 # prefix with 'v'
