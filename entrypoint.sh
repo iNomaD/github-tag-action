@@ -21,7 +21,8 @@ echo "pre_release = $pre_release"
 git fetch --tags
 
 # get latest tag
-tag=$(git describe --tags `git rev-list --tags --max-count=1`)
+tag_pattern='*.*.*'
+tag=$(git describe --tags `git rev-list --tags=$tag_pattern --max-count=1`)
 tag_commit=$(git rev-list -n 1 $tag)
 
 # get current commit hash for tag
