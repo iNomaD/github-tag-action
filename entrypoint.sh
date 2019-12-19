@@ -24,6 +24,7 @@ git fetch --tags
 tag_pattern='*.*.*'
 tag=$(git describe --tags `git rev-list --tags=$tag_pattern --max-count=1`)
 tag_commit=$(git rev-list -n 1 $tag)
+echo "Latest tag: $tag"
 
 # get current commit hash for tag
 commit=$(git rev-parse HEAD)
@@ -34,28 +35,52 @@ if [ "$tag_commit" == "$commit" ]; then
     exit 0
 fi
 
-# if there are none, start tags at 0.0.0
+# if there are none, start tags at default_tag
 if [ -z "$tag" ]
 then
-    log=$(git log --pretty=oneline)
     tag=$default_tag
+    new=$(semver bump prerel SNAPSHOT $tag)
+    log=''
 else
-    log=$(git log $tag..HEAD --pretty=oneline)
+    new=$tag
+    log=$(git log $tag_commit..HEAD --format='%H')
 fi
 
-# get and increment build number
-# will default to 1 if it was not a number
-build=$(semver get build $tag)
-build=$((build+1))
+for i in $log; do
+    # get commit message
+    message=$(git log --pretty=oneline $i | grep $i)
+    echo "New commit: $message"
 
-# get commit logs and determine home to bump the version
-# supports #major, #minor, #patch (anything else will be 'minor')
-case "$log" in
-    *#major* ) new=$(semver bump major $tag);;
-    *#minor* ) new=$(semver bump minor $tag);;
-    *#patch* ) new=$(semver bump patch $tag);;
-    * )        new=$(semver bump build `echo $build` $tag);;
-esac
+    # get commit logs and determine home to bump the version
+    # supports #major, #minor, #patch, #release
+    case "$message" in
+        *#major* )
+          new=$(semver bump major $new)
+          new=$(semver bump prerel SNAPSHOT $new)
+          ;;
+        *#minor* )
+          new=$(semver bump minor $new)
+          new=$(semver bump prerel SNAPSHOT $new)
+          ;;
+        *#patch* )
+          new=$(semver bump patch $new)
+          new=$(semver bump prerel SNAPSHOT $new)
+          ;;
+        *#release* )
+          new=$(semver bump release $new)
+          ;;
+    esac
+done
+
+# if version was not bumped then increment build number
+if [ "$new" == "$tag" ]; then
+    # get and increment build number
+    # will default to 1 if it was not a number
+    build=$(semver get build $tag)
+    build=$((build+1))
+    new=$(semver bump prerel SNAPSHOT $new)
+    new=$(semver bump build `echo $build` $new)
+fi
 
 # prefix with 'v'
 if $with_v
